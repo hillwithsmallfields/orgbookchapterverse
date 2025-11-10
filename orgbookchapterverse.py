@@ -5,6 +5,27 @@ Uses org-mode to store the text."""
 import os
 import re
 
+class OrgVerseRange:
+
+    """One of more consecutive verses from a book."""
+
+    # TODO
+
+class OrgVerse:
+
+    """A verse from a chapter of a book."""
+
+    def __init__(self, chapter, verse_number, text):
+        self.chapter = chapter
+        self.verse_number = verse_number
+        self._text = text
+
+    def __str__(self):
+        return f"<Verse {self.chapter.chapter_number}:{self.verse_number} of {self.chapter.book.title} from {self.chapter.book.collection.title}>"
+
+    def text(self):
+        return self._text
+
 class OrgChapterRange:
 
     """One or more consecutive chapters from a book."""
@@ -17,6 +38,10 @@ class OrgChapterRange:
 
     def __str__(self):
         return f"<Chapters {self.start} to {self.end} of {self.book.title} from {self.book.collection.title}>"
+
+    def verse(self, verse):
+        # TODO: return an OrgVerseRange
+        return None
 
     def text(self):
         """Return the text of the range of chapters."""
@@ -36,6 +61,34 @@ class OrgChapter:
 
     def text(self):
         return self._text
+
+    def _verse(self, verse):
+        """Return one verse from a chapter."""
+        text = self.text()
+        alpha = re.search(r"^ +%d .+$" % (verse.start if isinstance(verse, slice) else verse),
+                          text, re.MULTILINE)
+        if not alpha:
+            raise ValueError("no such verse")
+        return OrgVerse(chapter=self,
+                        verse_number=verse,
+                        text=alpha.group(0))
+
+    def verse(self, verse):
+        """Return one verse from a chapter, or a range of verses if a slice is specified."""
+        if isinstance(verse, str):
+            verse = slice(*verse.split("-")) if '-' in verse else int(verse)
+        text = self.text()
+        alpha = re.search(r"^ +%d " % (verse.start if isinstance(verse, slice) else verse),
+                          text, re.MULTILINE)
+        if not alpha:
+            raise ValueError("no such verse")
+        if isinstance(verse, slice):
+            return OrgVerseRange([self._verse(v) for v in range(*verse)])
+        else:
+            return self._verse(verse)
+
+    def __getitem__(self, key):
+        return self.verse(key)
 
 class OrgBook:
 
@@ -83,6 +136,9 @@ class OrgBook:
                                                             chapter.stop)])
         else:
             return self._chapter(start)
+
+    def __getitem__(self, key):
+        return self.chapter(key)
 
 class TextCollection:
 
@@ -139,9 +195,11 @@ if __name__ == "__main__":
     print(haggai.text())
     john = kjv["John"]
     print(john)
-    john3 = john.chapter(3)
+    john3 = john[3]
     print(john3)
     print(john3.text())
-    john16_18 = john.chapter(slice(16, 19))
+    print(john3[16])
+    print(john3[16].text())
+    john16_18 = john[16:19]
     print(john16_18)
     print(john16_18.text())

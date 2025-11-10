@@ -9,7 +9,17 @@ class OrgVerseRange:
 
     """One of more consecutive verses from a book."""
 
-    # TODO
+    def __init__(self, chapter, start_verse, end_verse, verses):
+        self.chapter = chapter
+        self.start_verse = start_verse
+        self.end_verse = end_verse
+        self.verses = verses
+
+    def __str__(self):
+        return f"<Verses {self.chapter.chapter_number}:{self.start_verse}-{self.end_verse} of {self.chapter.book.title} from {self.chapter.book.collection.title}>"
+
+    def text(self):
+        return "\n".join([v.text() for v in self.verses])
 
 class OrgVerse:
 
@@ -38,10 +48,6 @@ class OrgChapterRange:
 
     def __str__(self):
         return f"<Chapters {self.start} to {self.end} of {self.book.title} from {self.book.collection.title}>"
-
-    def verse(self, verse):
-        # TODO: return an OrgVerseRange
-        return None
 
     def text(self):
         """Return the text of the range of chapters."""
@@ -83,7 +89,10 @@ class OrgChapter:
         if not alpha:
             raise ValueError("no such verse")
         if isinstance(verse, slice):
-            return OrgVerseRange([self._verse(v) for v in range(*verse)])
+            return OrgVerseRange(chapter=self,
+                                 start_verse = verse.start,
+                                 end_verse = verse.stop-1,
+                                 verses=[self._verse(v) for v in range(verse.start, verse.stop)])
         else:
             return self._verse(verse)
 
@@ -203,3 +212,4 @@ if __name__ == "__main__":
     john16_18 = john[16:19]
     print(john16_18)
     print(john16_18.text())
+    print(kjv["Micah"][6][6:9].text())

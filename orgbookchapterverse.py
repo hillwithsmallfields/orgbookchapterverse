@@ -92,9 +92,14 @@ class OrgChapter:
             return OrgVerseRange(chapter=self,
                                  start_verse = verse.start,
                                  end_verse = verse.stop-1,
+                                 # TODO: handle open ranges
                                  verses=[self._verse(v) for v in range(verse.start, verse.stop)])
         else:
             return self._verse(verse)
+
+    def verses(self):
+        # TODO return all the verses of the chapter, as an OrgVerseRange
+        return None
 
     def __getitem__(self, key):
         return self.verse(key)
@@ -145,6 +150,31 @@ class OrgBook:
                                                             chapter.stop)])
         else:
             return self._chapter(start)
+
+    def verse(self, verse):
+        """Return a verse or verses of a book.
+
+        The key may be any of:
+        - chapter (all verses are returned)
+        - chapter:verse
+        - chapter:verse-verse
+        - chapter:verse-chapter:verse
+        """
+        if '-' in verse:
+            start, end = verse.split('-')
+            start_chapter, start_verse = start.split(':') if ':' in start else (start, 1)
+            end_chapter, end_verse = end.split(':') if ':' in end else (start_chapter, end)
+            if end_chapter < start_chapter:
+                raise ValueError('start and end the wrong way round')
+            if start_chapter == end_chapter:
+                return self.chapter(start_chapter).verse(slice(start_verse, end_verse))
+            verses = self.chapter(start_chapter).verse(slice(start_verse))
+        else:
+            if ':' in verse:
+                ch, v = verse.split(':')
+                return self.chapter(ch).verse(v)
+            else:
+                return self.chapter(verse).verses()
 
     def __getitem__(self, key):
         return self.chapter(key)

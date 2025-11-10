@@ -14,10 +14,13 @@ def get_args():
     return vars(parser.parse_args())
 
 def clean_line_text(line):
-    # TODO: remove HTML comment that appears on the last verse of each chapter
     line = line.removesuffix("</p> <!--... sharper than any twoedged sword... -->").strip()
-    if "<" in line:
-        print("html tag in:", line)
+    line = re.sub(r'<span class="person">([^<]+)</span>',
+                  r'\1', line)
+    line = re.sub(r'<span class="place">([^<]+)</span>',
+                  r'\1', line)
+    line = re.sub(r'<span class="word">([^<]+) </span>',
+                  r'**\1** ', line)
     return line
 
 def ingest_directory(directory, verbose=False):

@@ -224,6 +224,11 @@ class TextCollection:
                        title=alpha.group(1),  # in case the book was specified by number
                        text=onwards[:omega.start(0)] if omega else onwards)
 
+    def chapter(self, chapter_reference):
+        """Return one chapter from a book of a collection."""
+        book_name, chapter_number = chapter_reference.rsplit(' ', 1)
+        return self.book(book_name).chapter(chapter_number)
+
     def __getitem__(self, key):
         return self.book(title=key) if isinstance(key, str) else self.book(number=key)
 

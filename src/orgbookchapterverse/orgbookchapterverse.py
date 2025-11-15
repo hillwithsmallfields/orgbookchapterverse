@@ -69,7 +69,9 @@ class OrgChapter:
         return self._text
 
     def lines(self):
-        return self._text.split('\n')
+        return [line
+                for line in self._text.split('\n')
+                if line]
 
     def _verse(self, verse):
         """Return one verse from a chapter."""
@@ -121,7 +123,9 @@ class OrgBook:
         return self._text
 
     def lines(self):
-        return self._text.split('\n')
+        return [line
+                for line in self._text.split('\n')
+                if line]
 
     def __str__(self):
         return f"<Book {self.title} from {self.collection.title}>"
@@ -132,7 +136,7 @@ class OrgBook:
         alpha = re.search(r"^\*\* %d$" % chapter, text, re.MULTILINE)
         if not alpha:
             raise ValueError("No such chapter in %s: %d" % (self.title, chapter))
-        onwards = text[alpha.end(0):]
+        onwards = text[alpha.end(0)+1:]
         omega = re.search(r"^\*\* ", onwards, re.MULTILINE)
         return OrgChapter(book=self,
                           chapter=chapter,
@@ -230,7 +234,10 @@ class TextCollection:
         onwards = text[alpha.end(0):]
         omega = re.search(r"^\* ", onwards, re.MULTILINE)
         return OrgBook(collection=self,
-                       title=alpha.group(2),  # in case the book was specified by number
+                       # in case the book was specified by number, we
+                       # get the title from the book, instead of using
+                       # the one supplied:
+                       title=alpha.group(2),
                        book_number=alpha.group(1),
                        text=onwards[:omega.start(0)] if omega else onwards)
 
@@ -242,17 +249,25 @@ class TextCollection:
     def __getitem__(self, key):
         return self.book(title=key) if isinstance(key, str) else self.book(number=key)
 
+def strip_number(verse):
+    """Remove the number from a verse."""
+    return verse.strip(' ').split(maxsplit=1)[1] if verse else verse
+
 def interlinear_chapter(versions, book_name, chapter_number):
     """Return a structure representing the same chapter in several bible versions.
+
     The versions argument should be a sequence of TextCollection objects.
-    The result is a list of verses, where each verse is a list of versions' texts."""
+
+    The result is a list of verses, where each verse is a list of versions' texts.
+    """
     primary_book = versions[0].book(book_name)
-    return list(zip(*[book.chapter(chapter_number).lines()
-                      for book in ([primary_book]
-                                   + [version.book(number=primary_book.book_number,
-                                                   title=".+" # usual regexp only works for Latin text
-                                                   )
-                                      for version in versions[1:]])]))
+    return [[strip_number(version) for version in group]
+            for group in zip(*[book.chapter(chapter_number).lines()
+                               for book in ([primary_book]
+                                            + [version.book(number=primary_book.book_number,
+                                                            title=".+" # usual regexp only works for Latin text
+                                                            )
+                                               for version in versions[1:]])])]
 
 if __name__ == "__main__":
     kjv = TextCollection(os.path.expandvars("$BIBLE/kj.org"), "KJV")
@@ -264,7 +279,8 @@ if __name__ == "__main__":
     print(john)
     john3 = john[3]
     print(john3)
-    print(john3.text())
+    print("John 3 as text:", john3.text())
+    print("John 3 as lines:", john3.lines())
     gjoni = sq["GJONI"]
     gjoni3 = gjoni[3]
     print(gjoni3)

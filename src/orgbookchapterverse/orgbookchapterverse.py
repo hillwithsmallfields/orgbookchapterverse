@@ -68,6 +68,9 @@ class OrgChapter:
     def text(self):
         return self._text
 
+    def lines(self):
+        return self._text.split('\n')
+
     def _verse(self, verse):
         """Return one verse from a chapter."""
         text = self.text()
@@ -116,6 +119,9 @@ class OrgBook:
     def text(self):
         return self._text
 
+    def lines(self):
+        return self._text.split('\n')
+
     def __str__(self):
         return f"<Book {self.title} from {self.collection.title}>"
 
@@ -129,7 +135,7 @@ class OrgBook:
         omega = re.search(r"^\*\* ", onwards, re.MULTILINE)
         return OrgChapter(book=self,
                           chapter=chapter,
-                          text=onwards[:omega.start(0) if omega else onwards])
+                          text=onwards[:omega.start(0)] if omega else onwards)
 
     def chapter(self, chapter):
         """Return a chapter of the book, by number.

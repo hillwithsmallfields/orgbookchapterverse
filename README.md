@@ -1,2 +1,5 @@
 # orgbookchapterverse
-Get text from an org-mode file structured as book, chapter and verse
+
+Get text from an [org-mode](https://orgmode.org/) file structured as
+book, chapter and verse (such as Bible text).
+

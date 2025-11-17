@@ -1,0 +1,11 @@
+[project]
+description = "Retrieve Bible sections from an org-mode file."
+authors = [ { name="John C G Sturdy", email="jcg.sturdy@gmail.com" } ]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+name = "orgbookchapterverse"
+version = "0.1"
+
+[build-system]
+requires = ["flit_core >= 3.12.0, <4"]
+build-backend = "flit_core.buildapi"

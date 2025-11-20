@@ -1,6 +1,8 @@
 """Look up partial texts by book, chapter and verse.
 
-Uses org-mode to store the text."""
+Uses org-mode to store the text.
+
+Can also do some simple word frequency analysis."""
 
 import collections
 import os
@@ -9,6 +11,27 @@ import re
 def strip_number(verse):
     """Remove the number from a verse."""
     return verse.strip(' ').split(maxsplit=1)[1] if verse else verse
+
+def first_index_below(frequencies, cutoff):
+    """Return the index of the first pair in the list which has a second element below the cutoff.
+    Thanks to https://stackoverflow.com/questions/1701211"""
+    return next(i for i,v in enumerate(frequencies) if v[1] < cutoff)
+
+def frequencies_above(frequencies, cutoff):
+    """Return the word frequency pairs above a cutoff frequency."""
+    return frequencies[:first_index_below(frequencies, cutoff)]
+
+def frequencies_below(frequencies, cutoff):
+    """Return the word frequency pairs below a cutoff frequency."""
+    return frequencies[first_index_below(frequencies, cutoff):]
+
+def commonest_words(frequencies, cutoff):
+    """Return a set of words more common than the cutoff."""
+    return set(wf[0] for wf in frequencies_above(frequencies, cutoff))
+
+def less_common_words(frequencies, common_words):
+    """Return the word frequency pairs not in the common words."""
+    return [wf for wf in frequencies if wf[0] not in common_words]
 
 class OrgVerseRange:
 
@@ -86,9 +109,15 @@ class OrgChapter:
         The verse separator may be specified as an argument."""
         return separator.join([strip_number(v) for v in self.lines()])
 
-    def word_counts(self):
-        """Return a list of the words in this chapter, with their occurrence counts."""
-        return collections.Counter(w.lower() for w in re.split(r'\W+', self.flow_text())).most_common()
+    def word_counts(self, filter_out_words=None):
+        """Return a list of the words in this chapter, with their occurrence counts.
+
+        A set of words to filter out may be given."""
+        counts = collections.Counter(w.lower()
+                                     for w in re.split(r'\W+', self.flow_text())).most_common()
+        return (less_common_words(counts, filter_out_words)
+                if filter_out_words
+                else counts)
 
     def _verse(self, verse):
         """Return one verse from a chapter."""
@@ -136,16 +165,24 @@ class OrgBook:
         self.book_number = book_number
         self._text = text
 
+    def __str__(self):
+        return f"<Book {self.title} from {self.collection.title}>"
+
     def text(self):
         return self._text
 
     def lines(self):
+        """Return a list of the verses of the book."""
         return [line
                 for line in self._text.split('\n')
-                if line]
+                if line and not line.startswith('*')]
 
-    def __str__(self):
-        return f"<Book {self.title} from {self.collection.title}>"
+    def unnumbered_lines(self):
+        """Return a list of the verses of the book, without the numbers."""
+        return [strip_number(v) for v in self.lines()]
+
+    def flow_text(self, separator=" "):
+        return separator.join(self.unnumbered_lines())
 
     def _chapter(self, chapter):
         """Return a single chapter of a book."""
@@ -198,9 +235,24 @@ class OrgBook:
         """
         return [c.flow_text(separator=separator) for c in self.all_chapters()]
 
-    def all_chapter_word_counts(self):
-        """Return a list of lists of the words in each chapter, with their occurrence counts."""
-        return [c.word_counts() for c in self.all_chapters()]
+    def word_counts(self):
+        """Return a list of the words in this book, with their occurrence counts."""
+        return collections.Counter(w.lower() for w in re.split(r'\W+', self.flow_text())).most_common()
+
+    def all_chapter_word_counts(self, filter_out_words=None):
+        """Return a list of lists of the words in each chapter, with their occurrence counts.
+
+        A set of words to filter out may be given; or alternatively a
+        cutoff number for making a set of common words to filter out.
+        """
+        return [c.word_counts(self.commonest_words(filter_out_words)
+                              if isinstance(filter_out_words, int)
+                              else filter_out_words)
+                for c in self.all_chapters()]
+
+    def commonest_words(self, cutoff):
+        """Return a set of the words in the book more common than the given cutoff."""
+        return commonest_words(self.word_counts(), cutoff)
 
     def verse(self, verse):
         """Return a verse or verses of a book.

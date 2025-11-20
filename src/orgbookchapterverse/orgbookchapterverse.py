@@ -2,8 +2,13 @@
 
 Uses org-mode to store the text."""
 
+import collections
 import os
 import re
+
+def strip_number(verse):
+    """Remove the number from a verse."""
+    return verse.strip(' ').split(maxsplit=1)[1] if verse else verse
 
 class OrgVerseRange:
 
@@ -66,12 +71,24 @@ class OrgChapter:
         return f"<Chapter {self.chapter_number} of {self.book.title} from {self.book.collection.title}>"
 
     def text(self):
+        """Return the text of this chapter, as a string."""
         return self._text
 
     def lines(self):
+        """Return the text of this chapter, as list of lines."""
         return [line
                 for line in self._text.split('\n')
                 if line]
+
+    def flow_text(self, separator=" "):
+        """Return the text of this chapter, as a string with verse numbers removed.
+
+        The verse separator may be specified as an argument."""
+        return separator.join([strip_number(v) for v in self.lines()])
+
+    def word_counts(self):
+        """Return a list of the words in this chapter, with their occurrence counts."""
+        return collections.Counter(w.lower() for w in re.split(r'\W+', self.flow_text())).most_common()
 
     def _verse(self, verse):
         """Return one verse from a chapter."""
@@ -162,6 +179,29 @@ class OrgBook:
         else:
             return self._chapter(start)
 
+    def all_chapters(self):
+        """Return all chapters of a book, as OrgChapter objects."""
+        i = 1;
+        chapters = []
+        while True:
+            try:
+                chapters.append(self.chapter(i))
+            except ValueError:
+                return chapters
+            i += 1
+
+    def all_chapter_flow_texts(self, separator=" "):
+        """Return the texts of each chapter of a book.
+        Each chapter is a continuous string, with the verse numbers removed.
+
+        The verse separator may be specified as an argument.
+        """
+        return [c.flow_text(separator=separator) for c in self.all_chapters()]
+
+    def all_chapter_word_counts(self):
+        """Return a list of lists of the words in each chapter, with their occurrence counts."""
+        return [c.word_counts() for c in self.all_chapters()]
+
     def verse(self, verse):
         """Return a verse or verses of a book.
 
@@ -248,10 +288,6 @@ class TextCollection:
 
     def __getitem__(self, key):
         return self.book(title=key) if isinstance(key, str) else self.book(number=key)
-
-def strip_number(verse):
-    """Remove the number from a verse."""
-    return verse.strip(' ').split(maxsplit=1)[1] if verse else verse
 
 def interlinear_chapter(versions, book_name, chapter_number):
     """Return a structure representing the same chapter in several bible versions.

@@ -354,7 +354,12 @@ class TextCollection:
     """
 
     def __init__(self, filename, title=None):
-        self.filename = filename
+        expanded_filename = (filename
+                             if filename.endswith(".org") or os.path.exists(filename)
+                             else filename + ".org")
+        self.filename = (expanded_filename
+                         if os.path.exists(expanded_filename)
+                         else os.path.expandvars(os.path.join("$BIBLE", expanded_filename)))
         self.title = title or filename
         self._text = None
 

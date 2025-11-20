@@ -184,6 +184,10 @@ class OrgBook:
     def flow_text(self, separator=" "):
         return separator.join(self.unnumbered_lines())
 
+    def __len__(self):
+        """Return the number of chapters in this book."""
+        return self._text.count("\n** ")
+
     def _chapter(self, chapter):
         """Return a single chapter of a book."""
         text = self.text()
@@ -353,32 +357,44 @@ def interlinear_chapter(versions, book_name, chapter_number):
             for group in zip(*[book.chapter(chapter_number).lines()
                                for book in ([primary_book]
                                             + [version.book(number=primary_book.book_number,
-                                                            title=".+" # usual regexp only works for Latin text
+                                                            title=".+" # usual regexp only works for ASCII text
                                                             )
                                                for version in versions[1:]])])]
 
 if __name__ == "__main__":
+    """Some examples or tests."""
     kjv = TextCollection(os.path.expandvars("$BIBLE/kj.org"), "KJV")
     sq = TextCollection(os.path.expandvars("$BIBLE/al.org"), "Shqip")
+    print("The whole book of Haggai:")
     haggai = kjv["Haggai"]
     print(haggai)
     print(haggai.text())
     john = kjv["John"]
+    print("")
+    print("The Gospel according to St John:")
     print(john)
     john3 = john[3]
     print(john3)
-    print("John 3 as text:", john3.text())
-    print("John 3 as lines:", john3.lines())
+    print("John 3 as text:")
+    print(john3.text())
+    print("John 3 as lines:")
+    print(john3.lines())
     gjoni = sq["GJONI"]
     gjoni3 = gjoni[3]
+    print("John 3 in Albanian:")
     print(gjoni3)
     print(gjoni3.text())
+    print("John 3:16:")
     print(john3[16])
     print(john3[16].text())
+    print("")
+    print("Chapter range: John 16--19:")
     john16_18 = john[16:19]
     print(john16_18)
     print(john16_18.text())
     print(kjv["Micah"][6][6:9].text())
+    print("")
+    print("Interlinear verses of John 3:")
     for verse in interlinear_chapter([kjv,
                                       sq,
                                       TextCollection(os.path.expandvars("$BIBLE/pl.org"),
@@ -391,3 +407,8 @@ if __name__ == "__main__":
         print("---")
         for version in verse:
             print("  ", version)
+    psalms = kjv["Psalms"]
+    print("")
+    print("Commonest words in each psalm that occur on average less than once per psalm:")
+    for i, p in enumerate(psalms.all_chapter_word_counts(len(psalms))):
+        print(i+1, ">".join(w[0] for w in p[:12]))

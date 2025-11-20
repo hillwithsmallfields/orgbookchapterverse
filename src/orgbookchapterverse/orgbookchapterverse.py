@@ -5,6 +5,7 @@ Uses org-mode to store the text.
 Can also do some simple word frequency analysis."""
 
 import collections
+import math
 import os
 import re
 
@@ -119,6 +120,27 @@ class OrgChapter:
                 if filter_out_words
                 else counts)
 
+    def word_frequencies(self, filter_out_words=None):
+        """Return a list of the words in this chapter, with their frequencies.
+
+        A word's frequency is its count divided by the number of words in the chapter.
+
+        A set of words to filter out may be given."""
+        words = [w.lower() for w in re.split(r'\W+', self.flow_text())]
+        total = len(words)
+        frequencies = [(word, count/total)
+                       for word, count in collections.Counter(words).items()]
+        return (less_common_words(frequencies, filter_out_words)
+                if filter_out_words
+                else frequencies)
+
+    def tf_idf(self):
+        """Return the TF.IDF for the words in this chapter."""
+        return sorted([(word, frequency)
+                       for word, frequency in self.book.all_chapter_tf_idf()[self.chapter_number - 1].items()],
+                      key=lambda w: w[1],
+                      reverse=True)
+
     def _verse(self, verse):
         """Return one verse from a chapter."""
         text = self.text()
@@ -164,6 +186,8 @@ class OrgBook:
         self.title = title
         self.book_number = book_number
         self._text = text
+        self._inverse_document_frequencies = None # cache
+        self._tf_idf = None                       # cache
 
     def __str__(self):
         return f"<Book {self.title} from {self.collection.title}>"
@@ -239,9 +263,13 @@ class OrgBook:
         """
         return [c.flow_text(separator=separator) for c in self.all_chapters()]
 
+    def words(self):
+        """Return the set of words of this book."""
+        return set(re.split(r'\W+', self.flow_text()))
+
     def word_counts(self):
         """Return a list of the words in this book, with their occurrence counts."""
-        return collections.Counter(w.lower() for w in re.split(r'\W+', self.flow_text())).most_common()
+        return collections.Counter(w.lower() for w in self.words()).most_common()
 
     def all_chapter_word_counts(self, filter_out_words=None):
         """Return a list of lists of the words in each chapter, with their occurrence counts.
@@ -257,6 +285,30 @@ class OrgBook:
     def commonest_words(self, cutoff):
         """Return a set of the words in the book more common than the given cutoff."""
         return commonest_words(self.word_counts(), cutoff)
+
+    def inverse_document_frequencies(self):
+        """Return the IDFs of the words in this book."""
+        if self._inverse_document_frequencies is None:
+            chapter_texts = self.all_chapter_flow_texts()
+            n = len(chapter_texts) + 1
+            self._inverse_document_frequencies = {
+                word: math.log(n / (len([chapter
+                                         for chapter in chapter_texts
+                                         if word in chapter])
+                                    + 1))
+                for word in (w.lower() for w in self.words())
+            }
+        return self._inverse_document_frequencies
+
+    def all_chapter_tf_idf(self):
+        """Return the term_frequency⋅inverse_document_frequency for each word in each chapter."""
+        if self._tf_idf is None:
+            inverse_document_frequencies = self.inverse_document_frequencies()
+            self._tf_idf = [{word: frequency * inverse_document_frequencies[word]
+                             for word, frequency in chapter}
+                            for chapter in [c.word_frequencies()
+                                            for c in self.all_chapters()]]
+        return self._tf_idf
 
     def verse(self, verse):
         """Return a verse or verses of a book.
@@ -409,6 +461,10 @@ if __name__ == "__main__":
             print("  ", version)
     psalms = kjv["Psalms"]
     print("")
-    print("Commonest words in each psalm that occur on average less than once per psalm:")
-    for i, p in enumerate(psalms.all_chapter_word_counts(len(psalms))):
-        print(i+1, ">".join(w[0] for w in p[:12]))
+    print("Highest counted words in each psalm that occur on average less than once per psalm:")
+    for i, p in enumerate(psalms.all_chapter_word_counts(len(psalms)), start=1):
+        print(i, ">".join(w[0] for w in p[:12]))
+    print("")
+    print("tf-idf for each psalm:")
+    for p in psalms.all_chapters():
+        print(p.chapter_number, ">".join(w[0] for w in p.tf_idf()[:12] if w[1] > 0))

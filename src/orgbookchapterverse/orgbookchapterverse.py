@@ -9,6 +9,8 @@ import math
 import os
 import re
 
+import Stemmer
+
 def strip_number(verse):
     """Remove the number from a verse."""
     return verse.strip(' ').split(maxsplit=1)[1] if verse else verse
@@ -181,11 +183,13 @@ class OrgBook:
 
     """A whole book from a book collection (such as a book of the Bible)."""
 
-    def __init__(self, collection, title, book_number, text):
+    def __init__(self, collection, title, book_number, text, language=None):
         self.collection = collection
         self.title = title
         self.book_number = book_number
         self._text = text
+        self.stemmer = None
+        self.language = language
         self._inverse_document_frequencies = None # cache
         self._tf_idf = None                       # cache
 
@@ -263,31 +267,53 @@ class OrgBook:
         """
         return [c.flow_text(separator=separator) for c in self.all_chapters()]
 
-    def words(self):
-        """Return the set of words of this book."""
-        return set(re.split(r'\W+', self.flow_text()))
+    def words(self, stemmed=False):
+        """Return the set of words of this book.
 
-    def word_counts(self):
-        """Return a list of the words in this book, with their occurrence counts."""
-        return collections.Counter(w.lower() for w in self.words()).most_common()
+        The words may be stemmed, if a stemmer for the language concerned is available."""
+        raw = set(re.split(r'\W+', self.flow_text()))
+        if not stemmed:
+            return raw
+        if not self.stemmer:
+            if not self.language:
+                raise ValueError("trying to use a stemmer without a language")
+            if self.language not in Stemmer.algorithms():
+                raise ValueError("No stemmer available for %s" % self.language)
+            self.stemmer = Stemmer.Stemmer(self.language)
+        return set(self.stemmer.stemWords(raw))
 
-    def all_chapter_word_counts(self, filter_out_words=None):
+    def word_counts(self, stemmed=False):
+        """Return a Counter of the words in this book (with their occurrence counts).
+
+        The words may be stemmed, if a stemmer for the language concerned is available."""
+        return collections.Counter(w.lower() for w in self.words(stemmed)).most_common()
+
+    def all_chapter_word_counts(self, filter_out_words=None, stemmed=False):
         """Return a list of lists of the words in each chapter, with their occurrence counts.
 
         A set of words to filter out may be given; or alternatively a
         cutoff number for making a set of common words to filter out.
+
+        The words may be stemmed, if a stemmer for the language concerned is available.
         """
-        return [c.word_counts(self.commonest_words(filter_out_words)
+        return [c.word_counts(self.commonest_words(cutoff=filter_out_words,
+                                                   stemmed=stemmed)
                               if isinstance(filter_out_words, int)
-                              else filter_out_words)
+                              else [w
+                                    for w in self.commonest_words(stemmed=stemmed)
+                                    if w not in filter_out_words])
                 for c in self.all_chapters()]
 
-    def commonest_words(self, cutoff):
-        """Return a set of the words in the book more common than the given cutoff."""
-        return commonest_words(self.word_counts(), cutoff)
+    def commonest_words(self, cutoff, stemmed=False):
+        """Return a set of the words in the book more common than the given cutoff.
 
-    def inverse_document_frequencies(self):
-        """Return the IDFs of the words in this book."""
+        The words may be stemmed, if a stemmer for the language concerned is available."""
+        return commonest_words(self.word_counts(stemmed), cutoff)
+
+    def inverse_document_frequencies(self, stemmed=False):
+        """Return the IDFs of the words in this book.
+
+        The words may be stemmed, if a stemmer for the language concerned is available."""
         if self._inverse_document_frequencies is None:
             chapter_texts = self.all_chapter_flow_texts()
             n = len(chapter_texts) + 1
@@ -296,14 +322,16 @@ class OrgBook:
                                          for chapter in chapter_texts
                                          if word in chapter])
                                     + 1))
-                for word in (w.lower() for w in self.words())
+                for word in (w.lower() for w in self.words(stemmed))
             }
         return self._inverse_document_frequencies
 
-    def all_chapter_tf_idf(self):
-        """Return the term_frequency⋅inverse_document_frequency for each word in each chapter."""
+    def all_chapter_tf_idf(self, stemmed=False):
+        """Return the term_frequency⋅inverse_document_frequency for each word in each chapter.
+
+        The words may be stemmed, if a stemmer for the language concerned is available."""
         if self._tf_idf is None:
-            inverse_document_frequencies = self.inverse_document_frequencies()
+            inverse_document_frequencies = self.inverse_document_frequencies(stemmed)
             self._tf_idf = [{word: frequency * inverse_document_frequencies[word]
                              for word, frequency in chapter}
                             for chapter in [c.word_frequencies()
@@ -353,7 +381,7 @@ class TextCollection:
     - verses are indented text with the number at the start
     """
 
-    def __init__(self, filename, title=None):
+    def __init__(self, filename, title=None, language=None):
         expanded_filename = (filename
                              if filename.endswith(".org") or os.path.exists(filename)
                              else filename + ".org")
@@ -361,6 +389,7 @@ class TextCollection:
                          if os.path.exists(expanded_filename)
                          else os.path.expandvars(os.path.join("$BIBLE", expanded_filename)))
         self.title = title or filename
+        self.language = language
         self._text = None
 
     def __str__(self):
@@ -391,6 +420,7 @@ class TextCollection:
                        # get the title from the book, instead of using
                        # the one supplied:
                        title=alpha.group(2),
+                       language=self.language,
                        book_number=alpha.group(1),
                        text=onwards[:omega.start(0)] if omega else onwards)
 
@@ -420,8 +450,8 @@ def interlinear_chapter(versions, book_name, chapter_number):
 
 if __name__ == "__main__":
     """Some examples or tests."""
-    kjv = TextCollection(os.path.expandvars("$BIBLE/kj.org"), "KJV")
-    sq = TextCollection(os.path.expandvars("$BIBLE/al.org"), "Shqip")
+    kjv = TextCollection(os.path.expandvars("$BIBLE/kj.org"), title="KJV", language='english')
+    sq = TextCollection(os.path.expandvars("$BIBLE/al.org"), title="Shqip", language='albanian')
     print("The whole book of Haggai:")
     haggai = kjv["Haggai"]
     print(haggai)
@@ -436,7 +466,7 @@ if __name__ == "__main__":
     print(john3.text())
     print("John 3 as lines:")
     print(john3.lines())
-    gjoni = sq["GJONI"]
+    gjoni = sq["Gjoni"]
     gjoni3 = gjoni[3]
     print("John 3 in Albanian:")
     print(gjoni3)
@@ -451,25 +481,28 @@ if __name__ == "__main__":
     print(john16_18.text())
     print(kjv["Micah"][6][6:9].text())
     print("")
-    print("Interlinear verses of John 3:")
+    print("Interlinear verses of John 3 (English, Albanian, Polish, Greek, Ukrainian):")
     for verse in interlinear_chapter([kjv,
                                       sq,
                                       TextCollection(os.path.expandvars("$BIBLE/pl.org"),
-                                                     "Polska"),
+                                                     title="Polska",
+                                                     language='polish'),
                                       TextCollection(os.path.expandvars("$BIBLE/gk.org"),
-                                                     "Greek",),
+                                                     title="Greek",
+                                                     language='greek'),
                                       TextCollection(os.path.expandvars("$BIBLE/uk.org"),
-                                                     "Ukrainian"),
+                                                     title="Ukrainian",
+                                                     language='ukrainian'),
                                       ], "John", 3):
         print("---")
         for version in verse:
             print("  ", version)
     psalms = kjv["Psalms"]
     print("")
-    print("Highest counted words in each psalm that occur on average less than once per psalm:")
-    for i, p in enumerate(psalms.all_chapter_word_counts(len(psalms)), start=1):
-        print(i, ">".join(w[0] for w in p[:12]))
+    print("Highest counted words in each psalm:")
+    for i, p in enumerate(psalms.all_chapter_word_counts(len(psalms), stemmed=True), start=1):
+        print(i, " > ".join(w[0] for w in p[:12]))
     print("")
     print("tf-idf for each psalm:")
     for p in psalms.all_chapters():
-        print(p.chapter_number, ">".join(w[0] for w in p.tf_idf()[:12] if w[1] > 0))
+        print(p.chapter_number, " > ".join(w[0] for w in p.tf_idf()[:12] if w[1] > 0))

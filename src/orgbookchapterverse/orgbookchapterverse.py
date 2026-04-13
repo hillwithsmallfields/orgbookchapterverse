@@ -366,6 +366,9 @@ class TextCollection:
     def __str__(self):
         return f"<TextCollection {self.title}>"
 
+    def __repr__(self):
+        return f"<TextCollection {self.filename}>"
+
     def text(self):
         """Return the whole text of this document."""
         if self._text is None:
@@ -417,6 +420,12 @@ def interlinear_chapter(versions, book_name, chapter_number):
                                                             title=".+" # usual regexp only works for ASCII text
                                                             )
                                                for version in versions[1:]])])]
+
+def interlinear_chapters(versions, book_name, chapter_numbers):
+    """Return a structure representing the same chapters in several bible versions.
+    The result is a list of tuples of chapter numbers and chapter contents."""
+    return [(chapter, interlinear_chapter(versions, book_name, chapter))
+            for chapter in chapter_numbers]
 
 if __name__ == "__main__":
     """Some examples or tests."""

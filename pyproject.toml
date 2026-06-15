@@ -2,9 +2,10 @@
 description = "Retrieve Bible sections from an org-mode file."
 authors = [ { name="John C G Sturdy", email="jcg.sturdy@gmail.com" } ]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "GPL-3.0-or-later"
 name = "orgbookchapterverse"
-version = "0.1"
+version = "0.1.0"
+dynamic = ["dependencies"]
 
 [build-system]
 requires = ["setuptools"]

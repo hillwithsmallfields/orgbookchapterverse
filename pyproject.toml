@@ -4,7 +4,7 @@ authors = [ { name="John C G Sturdy", email="jcg.sturdy@gmail.com" } ]
 readme = "README.md"
 license = "GPL-3.0-or-later"
 name = "orgbookchapterverse"
-version = "0.1.0"
+version = "0.1.1"
 dynamic = ["dependencies"]
 
 [build-system]

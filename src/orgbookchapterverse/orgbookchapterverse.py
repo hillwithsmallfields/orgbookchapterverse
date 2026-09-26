@@ -453,7 +453,12 @@ def interlinear_chapter(versions, book_name, chapter_number):
 
 def interlinear_chapters(versions, book_name, chapter_numbers):
     """Return a structure representing the same chapters in several bible versions.
-    The result is a list of tuples of chapter numbers and chapter contents."""
+
+    The result is a list of tuples of chapter numbers and chapter contents.
+
+    Each chapter contents is a list of verses, where each verse is a
+    list of versions' texts.
+    """
     return [(chapter, interlinear_chapter(versions, book_name, chapter))
             for chapter in chapter_numbers]
 

@@ -462,6 +462,14 @@ def interlinear_chapters(versions, book_name, chapter_numbers):
     return [(chapter, interlinear_chapter(versions, book_name, chapter))
             for chapter in chapter_numbers]
 
+def interlinear_book_chapters(versions, book_names_chapter_numbers):
+    """Return a structure representing the same chapters in several bible versions.
+    The result is a list of tuples of chapter numbers and chapter contents."""
+    return [(pair
+             # .split(' ')[1]
+             , interlinear_chapter(versions, *pair.split(' ')))
+            for pair in book_names_chapter_numbers]
+
 if __name__ == "__main__":
     """Some examples or tests."""
     kjv = TextCollection(os.path.expandvars("$BIBLE/kj.org"), title="KJV", language='english')
